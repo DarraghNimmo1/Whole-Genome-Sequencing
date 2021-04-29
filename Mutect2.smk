@@ -1,16 +1,15 @@
 split = [1,2,3,4,5,6,7,8,9,10,11,12,13]
-SAMPLE = "P4A"
 
 
 rule all:
         input:
-            SAMPLE+"_funcotated.vcf"
+            expand("{sample}_funcotated.vcf", sample = SAMPLE)
 
 
 rule mutect2_1:
     input:
         fasta="/index/hg38/hg38.fa",
-        bam=SAMPLE+".bam",
+        bam="{sample}.bam",
         gnomad="/home/darragh/P51A/VQSR/af-only-gnomad.hg38.vcf.gz",
         hg38="/home/darragh/P51A/VQSR/1000g_pon.hg38.vcf.gz",
         intervals="/home/darragh/P51A_Somatic/test/file/{split}_of_13/scattered.bed"
@@ -28,7 +27,7 @@ rule GatherVCFs_1:
     input:
         expand("{directory}_unfiltered.vcf", directory=split),
     output:
-        "P4A_gathered_mutect.vcf",
+        "{sample}_gathered_mutect.vcf",
     run:
         INPUTS = " ".join(["--INPUT {}".format(x) for x in input])
         shell("gatk MergeVcfs {INPUTS} -O P4A_gathered_mutect.vcf --CREATE_INDEX true".format(INPUTS=INPUTS))
@@ -49,7 +48,7 @@ rule MergeMutectStats:
         thirteen = "13_unfiltered.vcf.stats",
 
     output:
-        stats = SAMPLE+"_gathered_mutect.vcf.stats",
+        stats = "{sample}_gathered_mutect.vcf.stats",
     shell:
         """
         gatk MergeMutectStats -stats {input.one} -stats {input.two} -stats {input.three} -stats {input.four} -stats {input.five} -stats {input.six} -stats {input.seven} -stats {input.eight} -stats {input.nine} -stats {input.ten} -stats {input.eleven} -stats {input.twelve} -stats {input.thirteen} -O {output.stats}
@@ -70,7 +69,7 @@ rule learn_orien_model:
         twelve = "12_f1r2.tar.gz",
         thirteen = "13_f1r2.tar.gz",
     output:
-        model = SAMPLE+"_all_read_orien_model.tar.gz"
+        model = "{sample}_all_read_orien_model.tar.gz"
     shell:
         """
         gatk LearnReadOrientationModel -I {input.one} -I {input.two} -I {input.three} -I {input.four} -I {input.five} -I {input.six} -I {input.seven} -I {input.eight} -I {input.nine} -I {input.ten} -I {input.eleven} -I {input.twelve} -I {input.thirteen} -O {output.model}
@@ -78,11 +77,11 @@ rule learn_orien_model:
 
 rule get_pile_up_summaries:
     input:
-        bam=SAMPLE+".bam",
+        bam="{sample}.bam",
         gnomad="/home/darragh/P51A_Somatic/BWA/test/af-only-gnomad.hg38.vcf.gz",
         int="/home/darragh/P51A_Somatic/BWA/test/wgs_calling_regions.hg38.interval_list"
     output:
-        table = SAMPLE+"_pileups.table"
+        table = "{sample}_pileups.table"
     shell:
         "gatk GetPileupSummaries -I {input.bam} -V {input.gnomad} -L {input.int} -O {output.table}"
 
@@ -90,7 +89,7 @@ rule calculate_contamination:
     input:
         rules.get_pile_up_summaries.output.table
     output:
-        contam= SAMPLE+"_calculatecontamination.table"
+        contam= "{sample}_calculatecontamination.table"
     shell:
         "gatk CalculateContamination -I {input} -O {output.contam}"
 
@@ -111,7 +110,7 @@ rule GatherVCFs_2:
         input:
                 expand("variants_{directory}_filtered.vcf", directory=split)
         output:
-                filtered = SAMPLE+"_gathered_filtered.vcf"
+                filtered = "{sample}_gathered_filtered.vcf"
         run:
                 INPUTS = " ".join(["--INPUT {}".format(x) for x in input])
                 shell("gatk MergeVcfs {INPUTS} -O P4A_gathered_filtered.vcf --CREATE_INDEX true".format(INPUTS=INPUTS))
@@ -121,7 +120,7 @@ rule funcotate:
         vcf = rules.GatherVCFs_2.output.filtered,
         fasta = "/index/hg38/hg38.fa"
     output:
-        funcotated = SAMPLE+"_funcotated.vcf"
+        funcotated = "{sample}_funcotated.vcf"
     params:
         data = "/home/darragh/funcotator_dataSources.v1.7.20200521s/use"
     shell:
