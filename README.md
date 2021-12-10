@@ -1,4 +1,4 @@
-# Whole-Genome-Sequencing-analysis
+# Whole-genome sequencing analysis
 
 This reporsitory contains snakemake scripts to: 
 
