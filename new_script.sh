@@ -17,3 +17,5 @@ BaseRecalibrator -I P1A_marked_duplicates.sorted.bam -R /index/hg38/hg38.fa --kn
 gatk ApplyBQSR -R /index/hg38/hg38.fa -I P1A_marked_duplicates.sorted.bam --bqsr-recal-file P1A_recal_data.table -O P1A_BQSR.bam
 
 gatk Mutect2 -R /index/hg38/hg38.fa -I P1A_BQSR.bam --germline-resource /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz --panel-of-normals /home/darragh/GATK/resources/1000g_pon.hg38.vcf.gz -O P1A_MUTECT2.vcf.gz --af-of-alleles-not-in-resource 5e-8 --f1r2-tar-gz f1r2.tar.gz --native-pair-hmm-threads 48
+
+gatk GetPileupSummaries -I P1A_BQSR.bam -V /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz -L /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz -O P1A_pileups.table
