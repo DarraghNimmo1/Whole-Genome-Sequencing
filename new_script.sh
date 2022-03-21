@@ -19,3 +19,17 @@ gatk ApplyBQSR -R /index/hg38/hg38.fa -I P1A_marked_duplicates.sorted.bam --bqsr
 gatk Mutect2 -R /index/hg38/hg38.fa -I P1A_BQSR.bam --germline-resource /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz --panel-of-normals /home/darragh/GATK/resources/1000g_pon.hg38.vcf.gz -O P1A_MUTECT2.vcf.gz --af-of-alleles-not-in-resource 5e-8 --f1r2-tar-gz f1r2.tar.gz --native-pair-hmm-threads 48
 
 gatk GetPileupSummaries -I P1A_BQSR.bam -V /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz -L /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf.gz -O P1A_pileups.table
+
+bcftools view --header-only  af-only-gnomad.hg38.vcf > af-only-gnomad.hg38_subsample.vcf 
+
+bcftools view --no-header af-only-gnomad.hg38.vcf | shuf -n1000000 >> af-only-gnomad.hg38_subsample.vcf
+
+bcftools view --no-header af-only-gnomad.hg38.vcf | shuf -n100000 | awk '{print $1"\t"$2-1"\t"$2}' > af-only-gnomad.hg38_1000000_sample.bed
+
+gatk --java-options -Xmx2048m GetPileupSummaries -I P1A_BQSR.bam -V /home/darragh/GATK/resources/af-only-gnomad.hg38.vcf -L ~/GATK/resources/af-only-gnomad.hg38_1000000_sample.bed -O P1A_pileups.table
+
+gatk CalculateContamination -I P1A_pileups.table -O contamination.table
+
+gatk LearnReadOrientationModel -I f1r2.tar.gz  -O P1A_artifact-prior.tar.gz
+
+gatk FilterMutectCalls -R /index/hg38/hg38.fa -V P1A_MUTECT2.vcf.gz --contamination-table contamination.table --orientation-bias-artifact-priors P1A_artifact-prior.tar.gz -O P1A_filtered.vcf.gz
