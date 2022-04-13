@@ -109,12 +109,13 @@ rule mark_duplicates:
     input:
         bam = expand(os.path.join(BAM_DIR, '{file_names}_subsetted.bam'), file_names = FILE_NAMES)
     output:
-        bam = os.path.join(BAM_DIR, '{sample}_marked_duplicates.bam')
+        bam = os.path.join(BAM_DIR, '{sample}_marked_duplicates.bam'),
+        txt = os.path.join(BAM_DIR, '{sample}_marked_duplicates.txt')
     params:
         picard = PICARD
     shell:
         """
-        gatk MarkDuplicates -I {input.bam}  -O {output.bam} --REMOVE_DUPLICATES true 
+        gatk MarkDuplicates -I {input.bam}  -O {output.bam} -M {output.txt}  --REMOVE_DUPLICATES true 
         """
  
 rule sortsam:
