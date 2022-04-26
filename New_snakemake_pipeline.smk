@@ -158,20 +158,82 @@ rule applybqsr:
         gatk ApplyBQSR -R {params.genome} -I {input.bam} --bqsr-recal-file {input.table} -O {output.bam}
         """
         
+
 rule mutect2:
     input:
         bam = rules.applybqsr.output.bam
     output:
-        vcf = os.path.join(VCF_DIR, '{sample}_MUTECT2.vcf.gz')    
+        vcf = os.path.join(VCF_DIR, '{sample}_MUTECT2.vcf.gz'),
+        orien = os.path.join(VCF_DIR, '{sample}_f1r2.tar.gz')
     params:
         genome = GENOME,
         gnomad = GNOMAD,
         pon = PON
     shell:
         """
-        gatk Mutect2 -R {params.genome} -I {input.bam} --germline-resource {input --panel-of-normals /home/darragh/GATK/resources/1000g_pon.hg38.vcf.gz -O P1A_MUTECT2.vcf.gz --af-of-alleles-not-in-resource 5e-8 --f1r2-tar-gz f1r2.tar.gz --native-pair-hmm-threads 48
+        gatk Mutect2 -R {params.genome} -I {input.bam} --germline-resource {params.gnomad} --panel-of-normals {params.pon} -O {output.vcf} --af-of-alleles-not-in-resource 5e-8 --f1r2-tar-gz {output.orien} --native-pair-hmm-threads 48
+        """
+
+rule get_pileup_summaries:
+    input:
+        bam = rules.applybqsr.output.bam
+    output:
+        table = os.path.join(BAM_DIR, '{sample}_pileups.table')
+    params:
+        gnomad_biallelic = GNOMAD_BIALLELIC
+
+    shell:
+        """
+        gatk  GetPileupSummaries -I {input.bam} -V {params.gnomad_biallelic} -L {params.gnomad_biallelic}  -O {output.table}
+        """
+
+rule calculate_contamination:
+    input:
+        table = rules.get_pileup_summaries.output.table
+    output:
+        table = os.path.join(BAM_DIR, '{sample}_contamination.table')
+    shell:
+        """
+        gatk CalculateContamination -I {input.table} -O {output.table}
+        """
+
+rule learn_orien:
+    input:
+        orien = rules.mutect2.output.orien
+    output:
+        prior = os.path.join(VCF_DIR, '{sample}_artifact-prior.tar.gz')
+    shell:
+        """
+        gatk LearnReadOrientationModel -I {input.orien}  -O {output.prior}
+        """
+
+rule filter_mutect_calls:
+    input:
+        vcf = rules.mutect2.output.vcf,
+        contam_table = rules.calculate_contamination.output.table,
+        prior = rules.learn_orien.output.prior
+    params:
+        genome = GENOME
+    output:
+        vcf =  os.path.join(VCF_DIR, '{sample}_MUTECT2.filtered.vcf.gz')
+    shell:
+        """
+        gatk FilterMutectCalls -R {params.genome} -V {input.vcf} --contamination-table {input.contam_table} --orientation-bias-artifact-priors {input.prior} -O {output.vcf}
         """
         
+rule annotate_vcf:
+    input:
+        vcf = rules.filter_mutect_calls.output.vcf
+    params:
+        genome = GENOME,
+        annotation_dir = ANNOTATION_DIR
+    output:
+        vcf = os.path.join(VCF_DIR, '{sample}_MUTECT2.filtered.annotated.vcf.gz')
+        
+    shell:
+        """
+        gatk Funcotator -R {params.genome} -V {input.vcf} -O {output.vcf} --output-file-format VCF --data-sources-path {params.annotation_dir} --ref-version hg38
+        """
 
      
-        
+     
